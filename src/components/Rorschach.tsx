@@ -133,35 +133,42 @@ const Rorschach: React.FC<RorschachProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reqIdRef = useRef<number | null>(null);
+  const glRef = useRef<WebGLRenderingContext | null>(null);
+  const programRef = useRef<WebGLProgram | null>(null);
+  const locsRef = useRef<any>({});
 
-  // Store parsed colors and props to avoid parsing every frame
-  const stateRef = useRef({
-    patternRgb: hexToRgb(patternColor),
-    backgroundRgb: hexToRgb(backgroundColor),
-    speed,
-    zoom,
-    density,
-    sharpness,
-    seed
-  });
+  // Memoize RGB values
+  const patternRgb = React.useMemo(() => hexToRgb(patternColor), [patternColor]);
+  const backgroundRgb = React.useMemo(() => hexToRgb(backgroundColor), [backgroundColor]);
 
+  // Handle all non-time uniform updates when props change
   useEffect(() => {
-    stateRef.current = {
-      patternRgb: hexToRgb(patternColor),
-      backgroundRgb: hexToRgb(backgroundColor),
-      speed,
-      zoom,
-      density,
-      sharpness,
-      seed
-    };
-  }, [patternColor, backgroundColor, speed, zoom, density, sharpness, seed]);
+    const gl = glRef.current;
+    if (!gl || !programRef.current) return;
+
+    gl.useProgram(programRef.current);
+    const locs = locsRef.current;
+
+    gl.uniform1f(locs.seed, seed);
+    gl.uniform1f(locs.speed, speed);
+    gl.uniform1f(locs.zoom, zoom);
+    gl.uniform1f(locs.density, density);
+    gl.uniform1f(locs.sharpness, sharpness);
+    gl.uniform3fv(locs.colorPattern, patternRgb);
+    gl.uniform3fv(locs.colorBg, backgroundRgb);
+  }, [seed, speed, zoom, density, sharpness, patternRgb, backgroundRgb]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const gl = canvas.getContext('webgl', { alpha: false, antialias: false });
+    const gl = canvas.getContext('webgl', {
+      alpha: false,
+      antialias: false,
+      depth: false,
+      preserveDrawingBuffer: false
+    });
     if (!gl) return;
+    glRef.current = gl;
 
     const createShader = (type: number, source: string) => {
       const shader = gl.createShader(type);
@@ -186,6 +193,7 @@ const Rorschach: React.FC<RorschachProps> = ({
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
+    programRef.current = program;
     gl.useProgram(program);
 
     const vertices = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
@@ -197,7 +205,7 @@ const Rorschach: React.FC<RorschachProps> = ({
     gl.enableVertexAttribArray(positionLocation);
     gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
-    const locs = {
+    locsRef.current = {
       resolution: gl.getUniformLocation(program, 'u_resolution'),
       time: gl.getUniformLocation(program, 'u_time'),
       seed: gl.getUniformLocation(program, 'u_seed'),
@@ -209,32 +217,38 @@ const Rorschach: React.FC<RorschachProps> = ({
       colorBg: gl.getUniformLocation(program, 'u_color_bg'),
     };
 
-    let startTime = performance.now();
-    const render = (time: number) => {
-      const { patternRgb, backgroundRgb, speed, zoom, density, sharpness, seed } = stateRef.current;
+    // Initial uniform set
+    gl.uniform1f(locsRef.current.seed, seed);
+    gl.uniform1f(locsRef.current.speed, speed);
+    gl.uniform1f(locsRef.current.zoom, zoom);
+    gl.uniform1f(locsRef.current.density, density);
+    gl.uniform1f(locsRef.current.sharpness, sharpness);
+    gl.uniform3fv(locsRef.current.colorPattern, hexToRgb(patternColor));
+    gl.uniform3fv(locsRef.current.colorBg, hexToRgb(backgroundColor));
 
-      // Handle resizing more efficiently
+    let startTime = performance.now();
+    let lastWidth = 0;
+    let lastHeight = 0;
+
+    const render = (time: number) => {
+      const gl = glRef.current;
+      if (!gl) return;
+
+      // Handle resizing only when needed
       const dpr = window.devicePixelRatio || 1;
       const displayWidth = Math.floor(canvas.clientWidth * dpr);
       const displayHeight = Math.floor(canvas.clientHeight * dpr);
 
-      if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+      if (lastWidth !== displayWidth || lastHeight !== displayHeight) {
+        lastWidth = displayWidth;
+        lastHeight = displayHeight;
         canvas.width = displayWidth;
         canvas.height = displayHeight;
         gl.viewport(0, 0, displayWidth, displayHeight);
-        gl.uniform2f(locs.resolution, displayWidth, displayHeight);
+        gl.uniform2f(locsRef.current.resolution, displayWidth, displayHeight);
       }
 
-      gl.uniform1f(locs.time, (time - startTime) * 0.001);
-      gl.uniform1f(locs.seed, seed);
-      gl.uniform1f(locs.speed, speed);
-      gl.uniform1f(locs.zoom, zoom);
-      gl.uniform1f(locs.density, density);
-      gl.uniform1f(locs.sharpness, sharpness);
-
-      gl.uniform3fv(locs.colorPattern, patternRgb);
-      gl.uniform3fv(locs.colorBg, backgroundRgb);
-
+      gl.uniform1f(locsRef.current.time, (time - startTime) * 0.001);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       reqIdRef.current = requestAnimationFrame(render);
     };
@@ -243,10 +257,14 @@ const Rorschach: React.FC<RorschachProps> = ({
 
     return () => {
       if (reqIdRef.current) cancelAnimationFrame(reqIdRef.current);
-      gl.deleteProgram(program);
-      gl.deleteShader(vertexShader);
-      gl.deleteShader(fragmentShader);
-      gl.deleteBuffer(buffer);
+      if (gl) {
+        gl.deleteProgram(program);
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+        gl.deleteBuffer(buffer);
+      }
+      glRef.current = null;
+      programRef.current = null;
     };
   }, []);
 

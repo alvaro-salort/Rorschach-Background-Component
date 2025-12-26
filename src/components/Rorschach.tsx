@@ -9,6 +9,7 @@ interface RorschachProps {
   sharpness?: number;
   seed?: number;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 const vertexShaderSource = `
@@ -112,10 +113,10 @@ function hexToRgb(hex: string): [number, number, number] {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
     ? [
-        parseInt(result[1], 16) / 255,
-        parseInt(result[2], 16) / 255,
-        parseInt(result[3], 16) / 255,
-      ]
+      parseInt(result[1], 16) / 255,
+      parseInt(result[2], 16) / 255,
+      parseInt(result[3], 16) / 255,
+    ]
     : [0, 0, 0];
 }
 
@@ -128,6 +129,7 @@ const Rorschach: React.FC<RorschachProps> = ({
   sharpness = 0.9,
   seed = 12345,
   className = "",
+  style = {},
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reqIdRef = useRef<number | null>(null);
@@ -221,7 +223,13 @@ const Rorschach: React.FC<RorschachProps> = ({
     };
   }, []);
 
-  return <canvas ref={canvasRef} className={`w-full h-full block ${className}`} />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className={className}
+      style={{ width: '100%', height: '100%', display: 'block', ...style }}
+    />
+  );
 };
 
 export default Rorschach;

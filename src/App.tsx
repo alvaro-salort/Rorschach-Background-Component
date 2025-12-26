@@ -10,15 +10,17 @@ export default function App() {
     const [sharpness, setSharpness] = useState(0.9);
 
     return (
-        <div style={{ width: '100vw', height: '100vh', position: 'relative', fontFamily: 'sans-serif' }}>
-            <Rorschach
-                patternColor={patternColor}
-                backgroundColor={backgroundColor}
-                speed={speed}
-                zoom={zoom}
-                density={density}
-                sharpness={sharpness}
-            />
+        <div style={{ width: '100vw', height: '100vh', position: 'relative', fontFamily: 'system-ui, -apple-system, sans-serif', overflow: 'hidden' }}>
+            <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: -1 }}>
+                <Rorschach
+                    patternColor={patternColor}
+                    backgroundColor={backgroundColor}
+                    speed={speed}
+                    zoom={zoom}
+                    density={density}
+                    sharpness={sharpness}
+                />
+            </div>
 
             <div style={{
                 position: 'absolute',

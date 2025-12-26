@@ -131,6 +131,11 @@ const Rorschach: React.FC<RorschachProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reqIdRef = useRef<number | null>(null);
+  const propsRef = useRef({ patternColor, backgroundColor, speed, zoom, density, sharpness, seed });
+
+  useEffect(() => {
+    propsRef.current = { patternColor, backgroundColor, speed, zoom, density, sharpness, seed };
+  }, [patternColor, backgroundColor, speed, zoom, density, sharpness, seed]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -144,6 +149,7 @@ const Rorschach: React.FC<RorschachProps> = ({
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
         gl.deleteShader(shader);
         return null;
       }
@@ -185,6 +191,7 @@ const Rorschach: React.FC<RorschachProps> = ({
 
     let startTime = performance.now();
     const render = (time: number) => {
+      const { patternColor, backgroundColor, speed, zoom, density, sharpness, seed } = propsRef.current;
       const dpr = window.devicePixelRatio || 1;
       const displayWidth = Math.floor(canvas.clientWidth * dpr);
       const displayHeight = Math.floor(canvas.clientHeight * dpr);
@@ -200,8 +207,8 @@ const Rorschach: React.FC<RorschachProps> = ({
       gl.uniform1f(locs.zoom, zoom);
       gl.uniform1f(locs.density, density);
       gl.uniform1f(locs.sharpness, sharpness);
-      const pColor = hexToRgb(patternColor);
-      const bColor = hexToRgb(backgroundColor);
+      const pColor = hexToRgb(patternColor!);
+      const bColor = hexToRgb(backgroundColor!);
       gl.uniform3f(locs.colorPattern, pColor[0], pColor[1], pColor[2]);
       gl.uniform3f(locs.colorBg, bColor[0], bColor[1], bColor[2]);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -212,7 +219,7 @@ const Rorschach: React.FC<RorschachProps> = ({
       if (reqIdRef.current) cancelAnimationFrame(reqIdRef.current);
       gl.deleteProgram(program);
     };
-  }, [patternColor, backgroundColor, speed, zoom, density, sharpness, seed]);
+  }, []);
 
   return <canvas ref={canvasRef} className={`w-full h-full block ${className}`} />;
 };

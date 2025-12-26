@@ -133,16 +133,34 @@ const Rorschach: React.FC<RorschachProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reqIdRef = useRef<number | null>(null);
-  const propsRef = useRef({ patternColor, backgroundColor, speed, zoom, density, sharpness, seed });
+
+  // Store parsed colors and props to avoid parsing every frame
+  const stateRef = useRef({
+    patternRgb: hexToRgb(patternColor),
+    backgroundRgb: hexToRgb(backgroundColor),
+    speed,
+    zoom,
+    density,
+    sharpness,
+    seed
+  });
 
   useEffect(() => {
-    propsRef.current = { patternColor, backgroundColor, speed, zoom, density, sharpness, seed };
+    stateRef.current = {
+      patternRgb: hexToRgb(patternColor),
+      backgroundRgb: hexToRgb(backgroundColor),
+      speed,
+      zoom,
+      density,
+      sharpness,
+      seed
+    };
   }, [patternColor, backgroundColor, speed, zoom, density, sharpness, seed]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const gl = canvas.getContext('webgl', { alpha: false });
+    const gl = canvas.getContext('webgl', { alpha: false, antialias: false });
     if (!gl) return;
 
     const createShader = (type: number, source: string) => {
@@ -193,33 +211,42 @@ const Rorschach: React.FC<RorschachProps> = ({
 
     let startTime = performance.now();
     const render = (time: number) => {
-      const { patternColor, backgroundColor, speed, zoom, density, sharpness, seed } = propsRef.current;
+      const { patternRgb, backgroundRgb, speed, zoom, density, sharpness, seed } = stateRef.current;
+
+      // Handle resizing more efficiently
       const dpr = window.devicePixelRatio || 1;
       const displayWidth = Math.floor(canvas.clientWidth * dpr);
       const displayHeight = Math.floor(canvas.clientHeight * dpr);
+
       if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
         canvas.width = displayWidth;
         canvas.height = displayHeight;
         gl.viewport(0, 0, displayWidth, displayHeight);
+        gl.uniform2f(locs.resolution, displayWidth, displayHeight);
       }
-      gl.uniform2f(locs.resolution, canvas.width, canvas.height);
+
       gl.uniform1f(locs.time, (time - startTime) * 0.001);
       gl.uniform1f(locs.seed, seed);
       gl.uniform1f(locs.speed, speed);
       gl.uniform1f(locs.zoom, zoom);
       gl.uniform1f(locs.density, density);
       gl.uniform1f(locs.sharpness, sharpness);
-      const pColor = hexToRgb(patternColor!);
-      const bColor = hexToRgb(backgroundColor!);
-      gl.uniform3f(locs.colorPattern, pColor[0], pColor[1], pColor[2]);
-      gl.uniform3f(locs.colorBg, bColor[0], bColor[1], bColor[2]);
+
+      gl.uniform3fv(locs.colorPattern, patternRgb);
+      gl.uniform3fv(locs.colorBg, backgroundRgb);
+
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       reqIdRef.current = requestAnimationFrame(render);
     };
+
     reqIdRef.current = requestAnimationFrame(render);
+
     return () => {
       if (reqIdRef.current) cancelAnimationFrame(reqIdRef.current);
       gl.deleteProgram(program);
+      gl.deleteShader(vertexShader);
+      gl.deleteShader(fragmentShader);
+      gl.deleteBuffer(buffer);
     };
   }, []);
 

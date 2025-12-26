@@ -1,15 +1,13 @@
 import { useState } from 'react';
-import { CodeTab, PreviewTab, TabsLayout } from '../../components/common/TabsLayout';
+import { PreviewTab, TabsLayout } from '../components/common/TabsLayout';
 import { Box, Flex, Text, Input } from '@chakra-ui/react';
 
-import CodeExample from '../../components/code/CodeExample';
-import PropTable from '../../components/common/Preview/PropTable';
-import Dependencies from '../../components/code/Dependencies';
-import Customize from '../../components/common/Preview/Customize';
-import PreviewSlider from '../../components/common/Preview/PreviewSlider';
+import PropTable from '../components/common/Preview/PropTable';
+import Dependencies from '../components/code/Dependencies';
+import Customize from '../components/common/Preview/Customize';
+import PreviewSlider from '../components/common/Preview/PreviewSlider';
 
-import Rorschach from '../../content/Backgrounds/Rorschach/Rorschach';
-import { rorschach } from '../../constants/code/Backgrounds/rorschachCode';
+import Rorschach from '../components/Rorschach';
 
 const RorschachDemo = () => {
   const [patternColor, setPatternColor] = useState('#111111');
@@ -131,10 +129,6 @@ const RorschachDemo = () => {
         {}
         <Dependencies dependencyList={[]} /> 
       </PreviewTab>
-
-      <CodeTab>
-        <CodeExample codeObject={rorschach} />
-      </CodeTab>
     </TabsLayout>
   );
 };
